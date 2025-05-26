@@ -5,7 +5,9 @@ namespace App\Modules\Auth\Models;
 use PDO;
 use PDOException;
 
-class User
+use App\Modules\Auth\Contracts\UserRepositoryInterface;
+
+class User implements UserRepositoryInterface 
 {
     protected PDO $db;
 
@@ -27,6 +29,14 @@ class User
             die('Connection failed: ' . $e->getMessage());
         }
     }
+public function findById(int $id): ?array
+{
+    $stmt = $this->db->prepare("SELECT * FROM users WHERE id = :id");
+    $stmt->execute(['id' => $id]);
+    $user = $stmt->fetch(\PDO::FETCH_ASSOC);
+    return $user ?: null;
+}
+
 
     public function findByEmail(string $email): ?array
     {
