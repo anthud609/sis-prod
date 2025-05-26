@@ -1,0 +1,12 @@
+# public/.htaccess
+
+RewriteEngine On
+
+# Redirect to HTTPS (optional for production with SSL)
+# RewriteCond %{HTTPS} !=on
+# RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Rewrite all requests to index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]
