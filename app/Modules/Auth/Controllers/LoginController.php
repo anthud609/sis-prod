@@ -21,22 +21,51 @@ class LoginController
         require __DIR__ . '/../Views/login.php';
     }
 
-    public function handleLogin()
-    {
-        $email = $_POST['email'] ?? '';
-        $password = $_POST['password'] ?? '';
+   public function handleLogin()
+{
+    $email = trim($_POST['email'] ?? '');
+    $password = $_POST['password'] ?? '';
 
-        $userModel = new User();
-        $user = $userModel->findByEmail($email);
+    $userModel = new User();
+    $user = $userModel->findByEmail($email);
 
-        if ($user && password_verify($password, $user['password'])) {
+    if (!$user) {
+        echo "Invalid credentials.";
+        return;
+    }
+
+    // Check password
+    if (!password_verify($password, $user['password'])) {
+        echo "Invalid credentials.";
+        return;
+    }
+
+    // Status-based restrictions
+    switch ($user['status']) {
+        case 'active':
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['email'] = $user['email'];
             header('Location: /dashboard');
-        } else {
-            echo "Invalid credentials";
-        }
+            exit;
+
+        case 'inactive':
+            echo "Your account is inactive. Please contact support.";
+            break;
+
+        case 'deleted':
+            echo "This account has been deleted.";
+            break;
+
+        case 'locked':
+            echo "Your account is locked due to too many failed login attempts.";
+            break;
+
+        default:
+            echo "Your account status is not recognized. Please contact support.";
+            break;
     }
+}
+
 
     public function dashboard()
     {
