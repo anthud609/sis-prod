@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <title>Your Dashboard</title>
-    <script src="https://kit.fontawesome.com/a2e0e6ad05.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+ <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans p-8">
 

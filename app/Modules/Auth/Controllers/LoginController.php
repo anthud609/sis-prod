@@ -90,6 +90,10 @@ public function dashboard(): Response {
     return $response;
 }
 
-
+public function logout(): Response {
+    session_destroy();
+    $response = new Response();
+    return $response->redirect('/login');
+}
 
 }
