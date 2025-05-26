@@ -31,7 +31,11 @@ public function redirectToProperPage(): Response {
 
     public function showLoginForm()
     {
-        require __DIR__ . '/../Views/login.php';
+        if (!isset($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    $csrfToken = $_SESSION['csrf_token'];
+    require __DIR__ . '/../Views/login.php';
     }
 
 public function handleLogin(): Response {
@@ -40,6 +44,12 @@ public function handleLogin(): Response {
 
     $user = $this->users->findByEmail($email);
     $response = new Response();
+    
+    // Validate CSRF token
+    if (!hash_equals($_SESSION['csrf_token'] ?? '', $this->request->post('csrf_token', ''))) {
+        $response->body = "Invalid request. Please try again.";
+        return $response;
+    }
 
     if (!$user || !password_verify($password, $user['password'])) {
         $response->body = "Invalid credentials.";
