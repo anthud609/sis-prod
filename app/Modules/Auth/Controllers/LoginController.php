@@ -6,6 +6,7 @@ use App\Modules\Auth\Models\User;
 use App\Modules\Auth\Contracts\UserRepositoryInterface;
 use App\Core\Request;
 use App\Core\Response;
+use App\Core\Logger;
 
 class LoginController
 {
@@ -16,24 +17,33 @@ class LoginController
     {
         $this->users = $users;
         $this->request = $request;
+        Logger::debug('LoginController instantiated');
     }
 
     public function redirectToProperPage(): Response 
     {
+        Logger::debug('redirectToProperPage called');
+        Logger::debug('Session user_id: ' . ($_SESSION['user_id'] ?? 'NOT SET'));
+        
         $response = new Response();
 
         if (isset($_SESSION['user_id'])) {
+            Logger::debug('User is logged in, redirecting to dashboard');
             return $response->redirect('/dashboard');
         }
 
+        Logger::debug('User not logged in, redirecting to login');
         return $response->redirect('/login');
     }
 
     public function showLoginForm()
     {
+        Logger::debug('showLoginForm called');
+        
         // Generate CSRF token if not exists
         if (!isset($_SESSION['csrf_token'])) {
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+            Logger::debug('Generated new CSRF token');
         }
         $csrfToken = $_SESSION['csrf_token'];
         
@@ -41,22 +51,37 @@ class LoginController
         $errors = [];
         if (isset($_SESSION['login_error'])) {
             $errors[] = $_SESSION['login_error'];
+            Logger::debug('Login error found: ' . $_SESSION['login_error']);
             unset($_SESSION['login_error']); // Clear the error after displaying
         }
 
+        Logger::debug('Rendering login form');
         require __DIR__ . '/../Views/login.php';
     }
 
     public function handleLogin(): Response 
     {
+        Logger::debug('handleLogin called');
+        Logger::debug('POST data: ' . print_r($_POST, true));
+        Logger::debug('Session before login: ' . print_r($_SESSION, true));
+        
         $response = new Response();
         
         // Get input values
         $email = trim($this->request->post('email', ''));
         $password = trim($this->request->post('password', ''));
+        
+        Logger::debug('Login attempt for email: ' . $email);
 
         // Validate CSRF token first
-        if (!hash_equals($_SESSION['csrf_token'] ?? '', $this->request->post('csrf_token', ''))) {
+        $submittedToken = $this->request->post('csrf_token', '');
+        $sessionToken = $_SESSION['csrf_token'] ?? '';
+        
+        Logger::debug('CSRF check - Submitted: ' . substr($submittedToken, 0, 10) . '...');
+        Logger::debug('CSRF check - Session: ' . substr($sessionToken, 0, 10) . '...');
+        
+        if (!hash_equals($sessionToken, $submittedToken)) {
+            Logger::error('CSRF token mismatch');
             $_SESSION['login_error'] = "Invalid request. Please try again.";
             return $response->redirect('/login');
         }
@@ -64,50 +89,85 @@ class LoginController
         // Validate input
         $validationErrors = $this->validateLoginInput($email, $password);
         if (!empty($validationErrors)) {
+            Logger::debug('Validation errors: ' . implode(', ', $validationErrors));
             $_SESSION['login_error'] = implode(' ', $validationErrors);
             return $response->redirect('/login');
         }
 
         // Check rate limiting
         if (!$this->checkRateLimit($email)) {
+            Logger::debug('Rate limit exceeded for: ' . $email);
             $_SESSION['login_error'] = "Too many failed attempts. Please try again later.";
             return $response->redirect('/login');
         }
 
         // Find user and verify credentials
+        Logger::debug('Looking up user in database...');
         $user = $this->users->findByEmail($email);
         
-        if (!$user || !password_verify($password, $user['password'])) {
+        if (!$user) {
+            Logger::debug('User not found in database');
             $this->recordFailedAttempt($email);
             $_SESSION['login_error'] = "Invalid email or password.";
             return $response->redirect('/login');
         }
+        
+        Logger::debug('User found: ' . print_r($user, true));
+        
+        if (!password_verify($password, $user['password'])) {
+            Logger::debug('Password verification failed');
+            $this->recordFailedAttempt($email);
+            $_SESSION['login_error'] = "Invalid email or password.";
+            return $response->redirect('/login');
+        }
+        
+        Logger::debug('Password verification successful');
 
         // Clear failed attempts on successful authentication
         $this->clearFailedAttempts($email);
 
         // Check user status
+        Logger::debug('User status: ' . $user['status']);
+        
         switch ($user['status']) {
             case 'active':
+                Logger::debug('User is active, proceeding with login');
+                
                 // Regenerate session ID for security
+                $oldSessionId = session_id();
                 session_regenerate_id(true);
+                $newSessionId = session_id();
+                
+                Logger::debug('Session regenerated from ' . $oldSessionId . ' to ' . $newSessionId);
+                
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['email'] = $user['email'];
+                
+                Logger::debug('Session variables set:');
+                Logger::debug('user_id: ' . $_SESSION['user_id']);
+                Logger::debug('email: ' . $_SESSION['email']);
+                Logger::debug('Full session after login: ' . print_r($_SESSION, true));
+                
+                Logger::debug('Redirecting to dashboard');
                 return $response->redirect('/dashboard');
 
             case 'inactive':
+                Logger::debug('User account is inactive');
                 $_SESSION['login_error'] = "Your account is inactive. Please contact support.";
                 break;
 
             case 'deleted':
+                Logger::debug('User account is deleted');
                 $_SESSION['login_error'] = "This account has been deleted.";
                 break;
 
             case 'locked':
+                Logger::debug('User account is locked');
                 $_SESSION['login_error'] = "Your account is locked due to too many failed login attempts.";
                 break;
 
             default:
+                Logger::debug('Unknown user status: ' . $user['status']);
                 $_SESSION['login_error'] = "Your account status is not recognized. Please contact support.";
         }
 
@@ -116,17 +176,31 @@ class LoginController
 
     public function dashboard(): Response 
     {
+        Logger::debug('dashboard called');
+        Logger::debug('Session at dashboard: ' . print_r($_SESSION, true));
+        
         $response = new Response();
 
         if (!isset($_SESSION['user_id'])) {
+            Logger::debug('No user_id in session, redirecting to login');
+            $_SESSION['login_error'] = "Please log in to access the dashboard.";
             return $response->redirect('/login');
         }
 
+        Logger::debug('Looking up user by ID: ' . $_SESSION['user_id']);
         $currentUser = $this->users->findById($_SESSION['user_id']);
+        
         if (!$currentUser) {
-            $_SESSION['login_error'] = "User not found.";
+            Logger::error('User not found by ID: ' . $_SESSION['user_id']);
+            session_unset();
+            session_destroy();
+            session_start();
+            $_SESSION['login_error'] = "User not found. Please log in again.";
             return $response->redirect('/login');
         }
+
+        Logger::debug('User found for dashboard: ' . print_r($currentUser, true));
+        Logger::debug('Rendering dashboard');
 
         ob_start();
         require __DIR__ . '/../Views/dashboard.php';
@@ -136,7 +210,18 @@ class LoginController
 
     public function logout(): Response 
     {
+        Logger::debug('logout called');
+        Logger::debug('Session before logout: ' . print_r($_SESSION, true));
+        
+        session_unset();
         session_destroy();
+        
+        // Start a new session for potential flash messages
+        session_start();
+        session_regenerate_id(true);
+        
+        Logger::debug('Session after logout: ' . print_r($_SESSION, true));
+        
         $response = new Response();
         return $response->redirect('/login');
     }
