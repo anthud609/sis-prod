@@ -7,5 +7,8 @@
       "Install\\": "install/",
       "App\\": "app/"
     }
-  }
+  },
+    "require-dev": {
+        "phpunit/phpunit": "^11.5"
+    }
 }
