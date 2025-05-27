@@ -7,7 +7,11 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  
+  <?php if (getenv('APP_ENV') === 'dev'): ?>
+    <script src="/devtools/overlay.js"></script>
+    <link rel="stylesheet" href="/devtools/overlay.css">
+<?php endif; ?>
+
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans p-8">
 
