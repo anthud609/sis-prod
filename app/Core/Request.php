@@ -7,10 +7,12 @@ class Request {
         return $_SERVER['REQUEST_METHOD'];
     }
 
-    public function getUri(): string {
-        $uri = $_SERVER['REQUEST_URI'];
-        return false !== $pos = strpos($uri, '?') ? substr($uri, 0, $pos) : $uri;
-    }
+public function getUri(): string {
+    $uri = $_SERVER['REQUEST_URI'];
+    $pos = strpos($uri, '?');
+    return $pos === false ? $uri : substr($uri, 0, $pos);
+}
+
 
     public function post(string $key, $default = null) {
         return $_POST[$key] ?? $default;
