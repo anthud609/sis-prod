@@ -8,7 +8,7 @@ class Logger
     
     public static function init(): void
     {
-        self::$logFile = __DIR__ . '/../../app.log';
+        self::$logFile = __DIR__ . '/../../storage/logs/app.log';
     }
     
     public static function debug(string $message): void

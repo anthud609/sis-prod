@@ -4,9 +4,21 @@ namespace App\Core;
 
 use FastRoute\RouteCollector;
 use function FastRoute\simpleDispatcher;
+use App\Modules\Auth\Contracts\{
+    AuthServiceInterface,
+    ValidatorInterface,
+    SessionManagerInterface
+};
 
 class Router
 {
+    private ServiceContainer $container;
+
+    public function __construct(ServiceContainer $container)
+    {
+        $this->container = $container;
+    }
+
     public function dispatch(): void
     {
         Logger::debug('Router dispatch started');
@@ -28,7 +40,6 @@ class Router
         $uri = rawurldecode($uri);
 
         Logger::debug("Request: {$httpMethod} {$uri}");
-        Logger::debug('Session in router: ' . print_r($_SESSION, true));
 
         $routeInfo = $dispatcher->dispatch($httpMethod, $uri);
 
@@ -51,7 +62,9 @@ class Router
 
                 Logger::debug("Route found: {$class}::{$method}");
 
-                if (!Middleware::checkAccess($uri)) {
+                // Check middleware
+                $authService = $this->container->resolve(AuthServiceInterface::class);
+                if (!Middleware::checkAccess($uri, $authService)) {
                     Logger::debug('Middleware denied access, redirecting to login');
                     (new Response())->redirect('/login')->send();
                     return;
@@ -61,14 +74,13 @@ class Router
 
                 if (class_exists($class) && method_exists($class, $method)) {
                     try {
-                        $request = new \App\Core\Request();
-                        $userRepo = new \App\Modules\Auth\Models\User(); // implements UserRepositoryInterface
-                        $controller = new $class($userRepo, $request);
+                        // Instantiate controller with dependencies
+                        $controller = $this->createController($class);
 
                         Logger::debug('Controller instantiated, calling method');
                         $result = call_user_func_array([$controller, $method], $vars);
 
-                        if ($result instanceof \App\Core\Response) {
+                        if ($result instanceof Response) {
                             Logger::debug('Sending response');
                             $result->send();
                         } else {
@@ -88,5 +100,20 @@ class Router
                 }
                 break;
         }
+    }
+
+    private function createController(string $class)
+    {
+        // For now, we only have LoginController - extend this for other controllers
+        if ($class === 'App\Modules\Auth\Controllers\LoginController') {
+            return new $class(
+                $this->container->resolve(AuthServiceInterface::class),
+                $this->container->resolve(ValidatorInterface::class),
+                $this->container->resolve(SessionManagerInterface::class),
+                $this->container->resolve(Request::class)
+            );
+        }
+
+        throw new \Exception("Unknown controller: {$class}");
     }
 }
